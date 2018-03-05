@@ -9,7 +9,7 @@
 // modify this part when testing a new file because every file is different
 #define CIRCUIT_FILE "C:\\Users\\Richard\\source\\repos\\petrinet2circuit\\petrinet2circuit\\output.txt"
 #define SPEC_FILE "C:\\Users\\Richard\\source\\repos\\petrinet2circuit\\petrinet2circuit\\test.spec"
-const int max_lines = 500;
+const int max_lines = 1000;
 const int k = 4;
 const int num_inout = 3;
 const int s_start = 28;
@@ -141,13 +141,13 @@ std::vector<int> testCircuit(std::vector<int>& arr_in) {
 			if (t == 0)arr[a] = 1;
 			else arr[a] = 0;
 		}
-		else if (s.find("XOR") != -1) {
+		else if (s.find("NOR") != -1) {
 			std::vector<int> vec;
 			str2int(vec, s);
 			int a = vec.at(0);
 			int b = vec.at(1);
 			int c = vec.at(2);
-			arr[a] = (arr[b] ^ arr[c]);
+			arr[a] = ~(arr[b] | arr[c]);
 		}
 		else if (s.find("OR") != -1) {
 			std::vector<int> vec;

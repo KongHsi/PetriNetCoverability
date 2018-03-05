@@ -70,16 +70,36 @@ std::vector<int> toBinary(int value) {
 	return bin;
 }
 
-std::vector<int> adder(int variable_wire, int constant_wire, int carry_wire) {
-	std::vector<int> sum;
+int XOR(int A, int B) {
+	int notA = current_wire_index++;
+	int notB = current_wire_index++;
 	int temp_wire1 = current_wire_index++;
 	int temp_wire2 = current_wire_index++;
-	int temp_wire3 = current_wire_index++;
+	int out = current_wire_index++;
+
+	f << "G" << notA << " = NOT(G" << A << ")" << std::endl;
+	f << "G" << notB << " = NOT(G" << B << ")" << std::endl;
+	f << "G" << temp_wire1 << " = NOR(G" << notA << ", G" << notB << ")" << std::endl;
+	f << "G" << temp_wire2 << " = NOR(G" << A << ", G" << B << ")" << std::endl;
+	f << "G" << out << " = NOR(G" << temp_wire1 << ", G" << temp_wire2 << ")" << std::endl;
+	return out;
+}
+
+int XNOR(int A, int B) {
+	int in = XOR(A, B);
+	int out = current_wire_index++;
+	f << "G" << out << " = NOT(G" << in << ")" << std::endl;
+	return out;
+}
+
+std::vector<int> adder(int variable_wire, int constant_wire, int carry_wire) {
+	std::vector<int> sum;
+	int temp_wire1 = XOR(variable_wire, constant_wire);
+	int temp_wire2 = current_wire_index++;
+	int temp_wire3 = XOR(temp_wire1, carry_wire);
 	int temp_wire4 = current_wire_index++;
 	int temp_wire5 = current_wire_index++;
-	f << "G" << temp_wire1 << " = XOR(G" << variable_wire << ", G" << constant_wire << ")" << std::endl;
 	f << "G" << temp_wire2 << " = AND(G" << variable_wire << ", G" << constant_wire << ")" << std::endl;
-	f << "G" << temp_wire3 << " = XOR(G" << temp_wire1 << ", G" << carry_wire << ")" << std::endl;
 	f << "G" << temp_wire4 << " = AND(G" << temp_wire1 << ", G" << carry_wire << ")" << std::endl;
 	f << "G" << temp_wire5 << " = OR(G" << temp_wire4 << ", G" << temp_wire2 << ")" << std::endl;
 	sum.push_back(temp_wire3);
@@ -109,12 +129,11 @@ int comparatorGreater(std::vector<int> A, std::vector<int> B) {
 		int b = B.at(i);
 		int notB = current_wire_index++;
 		int gt = current_wire_index++;
-		int eq = current_wire_index++;
+		int eq = XNOR(a, b);
 		int eqNgtb = current_wire_index++;
 		int gtbi = current_wire_index++;
 		f << "G" << notB << " = NOT(G" << b << ")" << std::endl;
 		f << "G" << gt << " = AND(G" << a << ", G" << notB << ")" << std::endl;
-		f << "G" << eq << " = XNOR(G" << a << ", G" << b << ")" << std::endl; //NOT SURE IF XNOR VALID
 		f << "G" << eqNgtb << " = AND(G" << eq << ", G" << gtb << ")" << std::endl;
 		f << "G" << gtbi << " = OR(G" << eqNgtb << ", G" << gt << ")" << std::endl;
 		gtb = gtbi;
@@ -145,9 +164,8 @@ int comparatorEqual(std::vector<int> A, std::vector<int> B) {
 	for (int i = 0; i < k; i++) {
 		int a = A.at(i);
 		int b = B.at(i);
-		int tempXNOR = current_wire_index++;
+		int tempXNOR = XNOR(a, b);
 		int tempAND = current_wire_index++;
-		f << "G" << tempXNOR << " = XNOR(G" << a << ", G" << b << ")" << std::endl; //NOT SURE IF XNOR VALID
 		f << "G" << tempAND << " = AND(G" << tempXNOR << ", G" << andOut << ")" << std::endl;
 		andOut = tempAND;
 	}
