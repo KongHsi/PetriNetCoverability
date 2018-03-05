@@ -17,6 +17,7 @@ int s_bits;
 int s_start;
 int p_out_result;
 std::ofstream f("output.txt");
+int mode = 1; // test mode (0) or production mode (1)
 
 std::vector<int> positiveToBinary(int value) {
 	std::vector<int> binary;
@@ -254,17 +255,25 @@ int main(int argc, char *argv[]) {
 		}
 
 		// print all current state wires
-		f << "# input and output wires" << std::endl;
-		for (int i = 0; i < countVars; i++) {
-			for (int j = 0; j < k; j++) {
-				f << "INPUT(G" << current_wire_index++ << ")" << std::endl;
+		// f << "# input and output wires" << std::endl;
+		if (mode == 0) {
+			for (int i = 0; i < countVars; i++) {
+				for (int j = 0; j < k; j++) {
+					f << "INPUT(G" << current_wire_index++ << ")" << std::endl;
+				}
+			}
+
+			// print all next state wires
+			for (int i = 0; i < countVars; i++) {
+				for (int j = 0; j < k; j++) {
+					f << "OUTPUT(G" << current_wire_index++ << ")" << std::endl;
+				}
 			}
 		}
-
-		// print all next state wires
-		for (int i = 0; i < countVars; i++) {
-			for (int j = 0; j < k; j++) {
-				f << "OUTPUT(G" << current_wire_index++ << ")" << std::endl;
+		else {
+			current_wire_index += 2 * countVars * k;
+			for (int i = 0; i < countVars * k; i++) {
+				f << "G" << i << " = DFF(G" << countVars * k + i << ")" << std::endl;
 			}
 		}
 		
