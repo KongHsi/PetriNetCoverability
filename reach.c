@@ -362,6 +362,7 @@ DdNode *build_reset_bdd()
 	    Cudd_RecursiveDeref(gbm,result);
 	    result = temp2;
 	}
+	printf("Initial Bdd size is %ld.\n",Cudd_DagSize(result));
 	return result;
 }
 
@@ -387,6 +388,15 @@ DdNode *image_monolithic_tr(DdNode *tr, DdNode *x,
 	return result;
 }
 
+int notSubsetOf(DdNode *U_new, DdNode *U_lift) {
+	DdNode* temp = Cudd_bddAnd(gbm, U_new, U_lift);
+	if(U_new != temp) {
+		return 1;
+	} 
+	return 0;
+}
+
+
 void reachable_states_monolithic_tr()
 	/* Computes the set of reachable states by building the
 	   single monolithic transition relation. */
@@ -400,7 +410,7 @@ void reachable_states_monolithic_tr()
     DdNode *R, *new_R, *image;
     DdNode *temp, *temp1;
 
-    DdNode *ns_in_cube;
+    DdNode *ns_in_cube; // ？
     printf("[initializing reachability...");
     fflush(stdout);
 
@@ -415,33 +425,34 @@ void reachable_states_monolithic_tr()
     Cudd_Ref(ps_in_cube);
     Cudd_Ref(ns_in_cube);
     for (i=0; i<state_var_count; i++) {
-	temp = Cudd_bddAnd(gbm,ps_in_cube,present_array[i]->bdd_var);
-	Cudd_Ref(temp);
-	Cudd_RecursiveDeref(gbm,ps_in_cube);
-	ps_in_cube = temp;
+		temp = Cudd_bddAnd(gbm,ps_in_cube,present_array[i]->bdd_var);
+		Cudd_Ref(temp);
+		Cudd_RecursiveDeref(gbm,ps_in_cube);
+		ps_in_cube = temp;
 
         temp1 = Cudd_bddAnd(gbm,ns_in_cube, next_array[i]->bdd_var);
         Cudd_Ref(temp1);
         Cudd_RecursiveDeref(gbm,ns_in_cube);
         ns_in_cube = temp1;
     }
+	
     for (i=0; i<input_count; i++) {
-	temp = Cudd_bddAnd(gbm,ps_in_cube,input_array[i]->bdd_var);
-	Cudd_Ref(temp);
-	Cudd_RecursiveDeref(gbm,ps_in_cube);
-	ps_in_cube = temp;
+		temp = Cudd_bddAnd(gbm,ps_in_cube,input_array[i]->bdd_var);
+		Cudd_Ref(temp);
+		Cudd_RecursiveDeref(gbm,ps_in_cube);
+		ps_in_cube = temp;
 
-	temp1 = Cudd_bddAnd(gbm, ns_in_cube, input_array[i]->bdd_var);
-        Cudd_Ref(temp1);
-        Cudd_RecursiveDeref(gbm,ns_in_cube);
-        ns_in_cube = temp1;
+		temp1 = Cudd_bddAnd(gbm, ns_in_cube, input_array[i]->bdd_var);
+		Cudd_Ref(temp1);
+		Cudd_RecursiveDeref(gbm,ns_in_cube);
+		ns_in_cube = temp1;
     }
 
     ps_vars = (DdNode **)malloc(state_var_count*sizeof(DdNode *));
     ns_vars = (DdNode **)malloc(state_var_count*sizeof(DdNode *));
     for (i=0; i<state_var_count; i++) {
-	ps_vars[i] = present_array[i]->bdd_var;
-	ns_vars[i] = next_array[i]->bdd_var;
+		ps_vars[i] = present_array[i]->bdd_var;
+		ns_vars[i] = next_array[i]->bdd_var;
     }
     printf("]\n");
 
@@ -462,73 +473,162 @@ void reachable_states_monolithic_tr()
     DdNode* outer_Image = Cudd_ReadOne(gbm); // The out most state
     Cudd_Ref(outer_Image);
     do {
-        R = new_R;
-	printf("Iteration %d:  BDD size is %d.\n",i,Cudd_DagSize(R));
-        
-	/* FIX THIS!!! */
-	/* OK, now put the code to do the reachability iteration in here. */
-	/* Be careful to free anything that you don't use. */
-	/* image_monolithic_tr computes images */
-	image = image_monolithic_tr(tr, R, ps_in_cube, ps_vars, ns_vars); // compute next state
-	Cudd_Ref(image);
-	DdNode* temp_R = Cudd_bddOr(gbm, R, image); // Combine reached state and next state
-        Cudd_Ref(temp_R);
-	Cudd_RecursiveDeref(gbm,image);
-	Cudd_RecursiveDeref(gbm,R);
-	new_R = temp_R;
-        if(R != new_R) { // Computer the out most state
-        	DdNode* temp3 = Cudd_Not(R); 
-		Cudd_Ref(temp3);
-		Cudd_RecursiveDeref(gbm,outer_Image);
-		outer_Image = Cudd_bddAnd(gbm, temp3, new_R);
-                Cudd_Ref(outer_Image);
-                Cudd_RecursiveDeref(gbm, temp3);
-	}
-        i++;
+		R = new_R;
+		printf("Iteration %d:  BDD size is %d.\n",i,Cudd_DagSize(R));
+			
+		/* FIX THIS!!! */
+		/* OK, now put the code to do the reachability iteration in here. */
+		/* Be careful to free anything that you don't use. */
+		/* image_monolithic_tr computes images */
+		image = image_monolithic_tr(tr, R, ps_in_cube, ps_vars, ns_vars); // compute next state
+		Cudd_Ref(image);
+		DdNode* temp_R = Cudd_bddOr(gbm, R, image); // Combine reached state and next state
+		Cudd_Ref(temp_R);
+		Cudd_RecursiveDeref(gbm,image);
+		Cudd_RecursiveDeref(gbm,R);
+		new_R = temp_R;
+		
+		if(R != new_R) { // Computer the out most state
+			DdNode* temp3 = Cudd_Not(R); 
+			Cudd_Ref(temp3);
+			Cudd_RecursiveDeref(gbm,outer_Image);
+			outer_Image = Cudd_bddAnd(gbm, temp3, new_R);
+			Cudd_Ref(outer_Image);
+			Cudd_RecursiveDeref(gbm, temp3);
+		}
+		i++;
     } while (R != new_R);
     Cudd_RecursiveDeref(gbm,new_R);
+
+	//temp used to test BH
+	DdNode* All_possible_states = Cudd_ReadOne(gbm);
+	Cudd_Ref(All_possible_states);
+	DdNode* All_possible_states_temp = Cudd_bddAnd(gbm, All_possible_states, R);
+	Cudd_Ref(All_possible_states_temp);
+	Cudd_RecursiveDeref(gbm, All_possible_states);
+	All_possible_states = All_possible_states_temp;
+	
     /* Print out the result. */
     printf("Convergence on iteration %d.\n",i);
     printf("Size of reachable state BDD:  %ld.\n",Cudd_DagSize(R));
     printf("Number of reachable states:  %0.0lf.\n",
-		Cudd_CountMinterm(gbm,R,state_var_count));
-
-    /* New Stuff */
-    printf("\nNow starting for backward reachability\n");
+	Cudd_CountMinterm(gbm,R,state_var_count));
     Cudd_RecursiveDeref(gbm, R);
-
-    new_R = Cudd_bddSwapVariables(gbm,outer_Image,ns_vars,ps_vars,state_var_count);
-    Cudd_Ref(new_R);
-    DdNode* temp_one = Cudd_ReadOne(gbm);
+	
+	/* New Stuff */
+	DdNode* temp_one = Cudd_ReadOne(gbm);
     Cudd_Ref(temp_one);
     DdNode* temp_zero = Cudd_Not(temp_one);
     Cudd_Ref(temp_zero);
-
+    
+		// backward reachability
+	printf("\nNow starting for backward reachability\n");
+    new_R = Cudd_bddSwapVariables(gbm,outer_Image,ns_vars,ps_vars,state_var_count);
+    Cudd_Ref(new_R);
     i = 1;
-    DdNode* temp_comp;
+	printf("Iteration %d, current bdd size is %ld.\n", 0, Cudd_DagSize(new_R));
+    DdNode* temp_comp;// Used to test whether reaching initial state
     do {
-        if(i!=0) Cudd_RecursiveDeref(gbm, temp_comp);
-	R = new_R;
-	image = image_monolithic_tr(tr, R, ns_in_cube, ns_vars, ps_vars);
-	DdNode* temp_R = Cudd_bddOr(gbm, R, image);
-	Cudd_Ref(temp_R);
+        if(i!=1) Cudd_RecursiveDeref(gbm, temp_comp);
+		R = new_R;
+		image = image_monolithic_tr(tr, R, ns_in_cube, ns_vars, ps_vars);
+		Cudd_Ref(image);
+		DdNode* temp_R = Cudd_bddOr(gbm, R, image);
+		Cudd_Ref(temp_R);
+		Cudd_RecursiveDeref(gbm,image);
         Cudd_RecursiveDeref(gbm, R);
         new_R = temp_R;
          
         //Check
-	DdNode* temp_present_new_R = Cudd_bddSwapVariables(gbm,new_R,ps_vars,ns_vars,state_var_count);
+		DdNode* temp_present_new_R = Cudd_bddSwapVariables(gbm,new_R,ps_vars,ns_vars,state_var_count);
         Cudd_Ref(temp_present_new_R);
         temp_comp = Cudd_bddAnd(gbm, temp_present_new_R, initial_R);
-	Cudd_Ref(temp_comp);
+		Cudd_Ref(temp_comp);
         printf("Iteration %d, comp bdd size is %ld, current bdd size is %ld.\n",i++, Cudd_DagSize(temp_comp), Cudd_DagSize(new_R));
         Cudd_RecursiveDeref(gbm, temp_present_new_R); 
     } while (temp_comp == temp_zero);
-    printf("Done\n");
-
+    printf("Done\n\n");
+    
+	/*BH Checking Algorithm*/
+	
+	// Building the bad state
+	DdNode* U = (Cudd_ReadOne(gbm));
+	Cudd_Ref(U);
+	DdNode* U_temp = (ps_vars[0]);
+	Cudd_Ref(U_temp);
+	DdNode* U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+	Cudd_Ref(U_temp1);
+	Cudd_RecursiveDeref(gbm,U);
+	Cudd_RecursiveDeref(gbm,U_temp);
+	U = U_temp1;
+	
+	U_temp = Cudd_Not(ps_vars[1]);
+	Cudd_Ref(U_temp);
+	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+	Cudd_Ref(U_temp1);
+	Cudd_RecursiveDeref(gbm,U);
+	Cudd_RecursiveDeref(gbm,U_temp);
+	U = U_temp1;
+	
+	U_temp = Cudd_Not(ps_vars[2]); //CURRENT STATE VALUE IS 4
+	Cudd_Ref(U_temp);
+	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+	Cudd_Ref(U_temp1);
+	Cudd_RecursiveDeref(gbm,U);
+	Cudd_RecursiveDeref(gbm,U_temp);
+	U = U_temp1;
+	
+	U_temp = Cudd_Not(ps_vars[3]);
+	Cudd_Ref(U_temp);
+	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+	Cudd_Ref(U_temp1);
+	Cudd_RecursiveDeref(gbm,U);
+	Cudd_RecursiveDeref(gbm,U_temp);
+	U = U_temp1;
+	
+	U_temp = Cudd_bddAnd(gbm, All_possible_states, U);
+	Cudd_Ref(U_temp);
+	if(U_temp == temp_zero)
+		printf("Bad state doesn't belong to possible states\n");
+	else
+		printf("Bad state belongs to possible states\n");
+	
+	// Testing notSubsetOf
+	// printf("subset: %d\n", notSubsetOf(U, All_possible_states));
+	
+	
+	
+	//int BH_i = compute_i(U); 
+	// currently arbitrarily chosen
+	int BH_i = 4; //hardcoded
+	int BH_n = BH_i;
+	int delta = 2; //hardcoded
+	/*
+	while(BH_n >= BH_i - delta) {
+		DdNode* U_lift = lift(U, BH_i); //TODO
+		DdNode* U_new = backward_reach(U_lift, i); //TODO
+		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R);
+		Cudd_Ref(intersection);
+		if(intersection == temp_one) {
+			printf("Verification failed\n");
+			break;
+		}
+		if(notSubsetOf(U_new, U_lift)) { //TODO
+			BH_n = BH_i;
+		}
+		BH_i++;
+	}
+	*/
+	printf("Verification succeed\n");
+	/*End of BH Algorithm */
+	
+	
     /* Clean up */
+	Cudd_RecursiveDeref(gbm,initial_R);
     Cudd_RecursiveDeref(gbm,tr);
     Cudd_RecursiveDeref(gbm,R);
     Cudd_RecursiveDeref(gbm,ps_in_cube);
+	Cudd_RecursiveDeref(gbm,ns_in_cube);
     free(ps_vars);
     free(ns_vars);
 }
@@ -563,7 +663,9 @@ main(int argc, char *argv[])
   find_fanout_counts();
   find_fanout_arrays();
   printf("]\n");
-
+  printf("TESTING=========\n");
+  printf("Number of variables： %d\n", state_var_count);
+  printf("TESTING=========\n");
   /* Compute the set of reachable states. */
   /* 	You can also try a different reachability iterations
   	and/or a different image computation if you wish. */
