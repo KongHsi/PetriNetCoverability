@@ -426,18 +426,26 @@ DdNode **intToDdNode(int num){
 	return nums;
 }
 
-DdNode *comparatorLessEqual(DdNode **vars, int start, DdNode **nums) {
+DdNode *comparatorLessEqual(DdNode **statesA, DdNode **statesB, int startIndex, int compareWithNumberOrStates) {
 	DdNode* gtb = Cudd_ReadLogicZero(gbm);
 	Cudd_Ref(gtb);
 	int i;
 	for(i = 0; i < var_size_k; i++) {
-		DdNode* notB = Cudd_Not(nums[i]);
+		int a, b;
+		if(compareWithNumberOrStates == 0) { //Number
+			a = i + startIndex;
+			b = i;
+		} else { //States
+			a = i + startIndex;
+			b = i + startIndex;
+		}
+		DdNode* notB = Cudd_Not(statesB[b]);
 		Cudd_Ref(notB);
-		DdNode* gt = Cudd_bddAnd(gbm, vars[i + start], notB);
+		DdNode* gt = Cudd_bddAnd(gbm, statesA[a], notB);
 		Cudd_RecursiveDeref(gbm, notB);
 		Cudd_Ref(gt);
 		
-		DdNode* eq = Cudd_bddXnor(gbm, vars[i + start], nums[i]);
+		DdNode* eq = Cudd_bddXnor(gbm, statesA[a], statesB[b]);
 		Cudd_Ref(eq);
 		DdNode* eqNgtb = Cudd_bddAnd(gbm, eq, gtb);
 		Cudd_RecursiveDeref(gbm, eq);
@@ -455,13 +463,13 @@ DdNode *comparatorLessEqual(DdNode **vars, int start, DdNode **nums) {
 	return result;
 }
 
-DdNode *comparator(DdNode* in, int num, DdNode ** vars) {
+DdNode *comparatorNumber(DdNode ** vars, int num) {
 	DdNode **nums = intToDdNode(num);
 	int i = 0;
-	DdNode* result = Cudd_ReadOne(gbm);
+	DdNode *result = Cudd_ReadOne(gbm);
 	Cudd_Ref(result);
 	while(i < state_var_count) {
-		DdNode *temp = comparatorLessEqual(vars, i, nums);
+		DdNode *temp = comparatorLessEqual(vars, nums, i, 0);
 		DdNode *temp1 = Cudd_bddAnd(gbm, result, temp);
 		Cudd_Ref(temp1);
 		Cudd_RecursiveDeref(gbm, result);
@@ -469,12 +477,67 @@ DdNode *comparator(DdNode* in, int num, DdNode ** vars) {
 		result = temp1;
 		i += var_size_k;
 	}
+	return result;
+}
+
+DdNode *comparatorState(DdNode ** ps_vars, DdNode ** ns_vars) {
+	int i = 0;
+	DdNode *result = Cudd_ReadOne(gbm);
+	Cudd_Ref(result);
+	while(i < state_var_count) {
+		DdNode *temp = comparatorLessEqual(ps_vars, ns_vars, i, 1);
+		DdNode *temp1 = Cudd_bddAnd(gbm, result, temp);
+		Cudd_Ref(temp1);
+		Cudd_RecursiveDeref(gbm, result);
+		Cudd_RecursiveDeref(gbm, temp);
+		result = temp1;
+		i += var_size_k;
+	}
+	return result;
+}
+
+DdNode *lift(DdNode* x, int bound, DdNode ** ps_vars, DdNode ** ns_vars, DdNode *ps_in_cube){
+	DdNode *weightBound = comparatorNumber(ns_vars, bound);
+	DdNode *order = comparatorState(ps_vars, ns_vars);
+	DdNode *andAbove = Cudd_bddAnd(gbm, weightBound, order);
+	Cudd_Ref(andAbove);
+	Cudd_RecursiveDeref(gbm, order);
+	Cudd_RecursiveDeref(gbm, weightBound);
 	
-	DdNode* temp = Cudd_bddAnd(gbm, in, result);
-	Cudd_RecursiveDeref(gbm, result);
+	DdNode *temp = Cudd_bddAndAbstract(gbm,andAbove,x,ps_in_cube); //WHY PS not NS? also ask image_monolithic_tr.. i think i forgot this again, it quantifies out...
 	Cudd_Ref(temp);
 	
-	return temp;
+	DdNode *result = Cudd_bddSwapVariables(gbm,temp,ps_vars,ns_vars,state_var_count);
+	Cudd_Ref(result);
+	Cudd_RecursiveDeref(gbm,temp);
+	return result;
+}
+
+DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, DdNode **ns_vars, DdNode *ns_in_cube ) {
+	// make state -> ns_vars
+	DdNode *new_R = Cudd_bddSwapVariables(gbm,states,ns_vars,ps_vars,state_var_count);
+	Cudd_Ref(new_R);
+	DdNode *weightBound = comparatorNumber(ns_vars, bound);
+	Cudd_RecursiveDeref(gbm, weightBound);
+	DdNode *R;
+	do {
+		R = new_R;
+		DdNode *image = image_monolithic_tr(tr, R, ns_in_cube, ns_vars, ps_vars);
+		Cudd_Ref(image);
+		DdNode* temp_R = Cudd_bddOr(gbm, R, image);
+		Cudd_Ref(temp_R);
+		Cudd_RecursiveDeref(gbm,image);
+		Cudd_RecursiveDeref(gbm, R);
+		DdNode* temp_R_weight = Cudd_bddAnd(gbm, temp_R, weightBound);
+		Cudd_Ref(temp_R_weight);
+		Cudd_RecursiveDeref(gbm, temp_R);
+		new_R = temp_R_weight;
+    } while (new_R != R);
+	
+	R = Cudd_bddSwapVariables(gbm,new_R,ps_vars,ns_vars,state_var_count);
+	Cudd_Ref(R);
+	Cudd_RecursiveDeref(gbm, new_R);
+	return R;
 }
 
 void reachable_states_monolithic_tr()
@@ -632,9 +695,9 @@ void reachable_states_monolithic_tr()
 	/*BH Checking Algorithm*/
 	
 	// Building the bad state
-	DdNode* U = (Cudd_ReadOne(gbm));
+	DdNode* U = Cudd_ReadOne(gbm);
 	Cudd_Ref(U);
-	DdNode* U_temp = (ps_vars[0]);
+	DdNode* U_temp = Cudd_Not(ps_vars[0]);
 	Cudd_Ref(U_temp);
 	DdNode* U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
 	Cudd_Ref(U_temp1);
@@ -673,39 +736,61 @@ void reachable_states_monolithic_tr()
 	else
 		printf("Bad state belongs to possible states\n");
 	
+	/*
 	// Testing notSubsetOf
 	// printf("subset: %d\n", notSubsetOf(U, All_possible_states));
+	*/
 	
+	/*
 	//Testing comparator
-	//DdNode* comparator_test = comparator(U, 0, ps_vars);
-	//if(comparator_test == temp_zero)
-	//	printf("Bigger\n");
-	//else
-	//	printf("Smaller or equal\n");
-
+	DdNode* comparator_test = comparatorNumber(ps_vars, 4);
+	DdNode* temppppp = Cudd_bddAnd(gbm, comparator_test, U);
+	Cudd_Ref(temppppp);
+	comparator_test = temppppp;
+	if(comparator_test == temp_zero)
+		printf("Bigger\n");
+	else {
+		printf("Smaller or equal\n");
+		printf("%d\n",Cudd_DagSize(comparator_test));
+	}
+	*/
 	
-	//int BH_i = compute_i(U); 
-	// currently arbitrarily chosen
+	/*
+	printf("Lift before: %d\n",Cudd_DagSize(U));
+	DdNode *liftTest = lift(U, 7, ps_vars, ns_vars, ps_in_cube);
+	printf("Lift after: %d\n",Cudd_DagSize(liftTest));
+	*/
+	
+	/*
+	printf("br before: %d\n",Cudd_DagSize(U));
+	DdNode *brTest = backward_reach(U, 2, tr, ps_vars, ns_vars, ns_in_cube);
+	printf("br: %d\n",Cudd_DagSize(brTest));
+	*/
+	
+	//int BH_i = compute_i(U); // currently arbitrarily chosen
 	int BH_i = 4; //hardcoded
 	int BH_n = BH_i;
 	int delta = 2; //hardcoded
-	/*
+	
+	int flag = 0;
 	while(BH_n >= BH_i - delta) {
-		DdNode* U_lift = lift(U, BH_i); //TODO
-		DdNode* U_new = backward_reach(U_lift, BH_i); //TODO
+		DdNode* U_lift = lift(U, BH_i, ps_vars, ns_vars, ps_in_cube);
+		DdNode* U_new = backward_reach(U_lift, BH_i, tr, ps_vars, ns_vars, ns_in_cube);
 		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R);
 		Cudd_Ref(intersection);
-		if(intersection == temp_one) {
+		if(intersection != temp_zero) {
 			printf("Verification failed\n");
+			flag = 1;
 			break;
 		}
-		if(notSubsetOf(U_new, U_lift)) { //TODO
+		if(notSubsetOf(U_new, U_lift)) {
 			BH_n = BH_i;
 		}
 		BH_i++;
 	}
-	*/
-	printf("Verification succeed\n");
+	
+	if(flag == 0)
+		printf("Verification succeed\n");
 	/*End of BH Algorithm */
 	
 	
