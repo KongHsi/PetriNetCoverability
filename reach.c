@@ -23,7 +23,8 @@ wire next_array[MAXFF];
 
 DdManager *gbm;	/* Global BDD manager. */
 
-
+/* Richard's constants */
+int var_size_k = 4;
 
 
 /*  fanout arrays are computed in two passes.
@@ -396,6 +397,85 @@ int notSubsetOf(DdNode *U_new, DdNode *U_lift) {
 	return 0;
 }
 
+DdNode **intToDdNode(int num){
+	if(num < 0 || num >= (int)pow(2.0, (double)var_size_k)) {
+		printf("ERROR: INVALID LIFTING VALUE. \n");
+	}
+	DdNode* temp_one = Cudd_ReadOne(gbm);
+    Cudd_Ref(temp_one);
+    DdNode* temp_zero = Cudd_Not(temp_one);
+    Cudd_Ref(temp_zero);
+	
+	DdNode **nums = (DdNode **)malloc(var_size_k*sizeof(DdNode *));
+	int i = 0;
+	if(num == 0) {
+		nums[i++] = temp_zero;
+	}else if(num == 1){
+		nums[i++] = temp_one;
+	}else {
+		while(num > 0) {
+			nums[i++] = (num % 2) == 0 ? temp_zero : temp_one;
+			num /= 2;
+		}
+	}
+	
+	while(i < var_size_k) {
+		nums[i++] = temp_zero;
+	}
+	
+	return nums;
+}
+
+DdNode *comparatorLessEqual(DdNode **vars, int start, DdNode **nums) {
+	DdNode* gtb = Cudd_ReadLogicZero(gbm);
+	Cudd_Ref(gtb);
+	int i;
+	for(i = 0; i < var_size_k; i++) {
+		DdNode* notB = Cudd_Not(nums[i]);
+		Cudd_Ref(notB);
+		DdNode* gt = Cudd_bddAnd(gbm, vars[i + start], notB);
+		Cudd_RecursiveDeref(gbm, notB);
+		Cudd_Ref(gt);
+		
+		DdNode* eq = Cudd_bddXnor(gbm, vars[i + start], nums[i]);
+		Cudd_Ref(eq);
+		DdNode* eqNgtb = Cudd_bddAnd(gbm, eq, gtb);
+		Cudd_RecursiveDeref(gbm, eq);
+		Cudd_Ref(eqNgtb);
+		
+		DdNode* gtbi = Cudd_bddOr(gbm, eqNgtb, gt);
+		Cudd_Ref(gtbi);
+		Cudd_RecursiveDeref(gbm, gtb);
+		gtb = gtbi;
+	}
+	
+	DdNode* result = Cudd_Not(gtb);
+	Cudd_Ref(result);
+	Cudd_RecursiveDeref(gbm, gtb);
+	return result;
+}
+
+DdNode *comparator(DdNode* in, int num, DdNode ** vars) {
+	DdNode **nums = intToDdNode(num);
+	int i = 0;
+	DdNode* result = Cudd_ReadOne(gbm);
+	Cudd_Ref(result);
+	while(i < state_var_count) {
+		DdNode *temp = comparatorLessEqual(vars, i, nums);
+		DdNode *temp1 = Cudd_bddAnd(gbm, result, temp);
+		Cudd_Ref(temp1);
+		Cudd_RecursiveDeref(gbm, result);
+		Cudd_RecursiveDeref(gbm, temp);
+		result = temp1;
+		i += var_size_k;
+	}
+	
+	DdNode* temp = Cudd_bddAnd(gbm, in, result);
+	Cudd_RecursiveDeref(gbm, result);
+	Cudd_Ref(temp);
+	
+	return temp;
+}
 
 void reachable_states_monolithic_tr()
 	/* Computes the set of reachable states by building the
@@ -410,7 +490,7 @@ void reachable_states_monolithic_tr()
     DdNode *R, *new_R, *image;
     DdNode *temp, *temp1;
 
-    DdNode *ns_in_cube; // ？
+    DdNode *ns_in_cube; // ?
     printf("[initializing reachability...");
     fflush(stdout);
 
@@ -596,7 +676,13 @@ void reachable_states_monolithic_tr()
 	// Testing notSubsetOf
 	// printf("subset: %d\n", notSubsetOf(U, All_possible_states));
 	
-	
+	//Testing comparator
+	//DdNode* comparator_test = comparator(U, 0, ps_vars);
+	//if(comparator_test == temp_zero)
+	//	printf("Bigger\n");
+	//else
+	//	printf("Smaller or equal\n");
+
 	
 	//int BH_i = compute_i(U); 
 	// currently arbitrarily chosen
@@ -606,7 +692,7 @@ void reachable_states_monolithic_tr()
 	/*
 	while(BH_n >= BH_i - delta) {
 		DdNode* U_lift = lift(U, BH_i); //TODO
-		DdNode* U_new = backward_reach(U_lift, i); //TODO
+		DdNode* U_new = backward_reach(U_lift, BH_i); //TODO
 		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R);
 		Cudd_Ref(intersection);
 		if(intersection == temp_one) {
