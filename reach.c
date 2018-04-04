@@ -25,7 +25,8 @@ DdManager *gbm;	/* Global BDD manager. */
 
 /* Richard's constants */
 int var_size_k = 4;
-
+int INITIAL_WEIGHT = 4;
+int DELTA = 2;
 
 /*  fanout arrays are computed in two passes.
 /*  Pass 1 discovers the sizes of the fanout sets
@@ -524,13 +525,13 @@ DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, 
 		R = new_R;
 		DdNode *image = image_monolithic_tr(tr, R, ns_in_cube, ns_vars, ps_vars);
 		Cudd_Ref(image);
-		DdNode* temp_R = Cudd_bddOr(gbm, R, image);
-		Cudd_Ref(temp_R);
+		//DdNode* temp_R = Cudd_bddOr(gbm, R, image);
+		//Cudd_Ref(temp_R);
 		Cudd_RecursiveDeref(gbm,image);
 		Cudd_RecursiveDeref(gbm, R);
-		DdNode* temp_R_weight = Cudd_bddAnd(gbm, temp_R, weightBound);
+		DdNode* temp_R_weight = Cudd_bddAnd(gbm, image, weightBound);
 		Cudd_Ref(temp_R_weight);
-		Cudd_RecursiveDeref(gbm, temp_R);
+		//Cudd_RecursiveDeref(gbm, temp_R);
 		new_R = temp_R_weight;
     } while (new_R != R);
 	
@@ -705,7 +706,7 @@ void reachable_states_monolithic_tr()
 	Cudd_RecursiveDeref(gbm,U_temp);
 	U = U_temp1;
 	
-	U_temp = Cudd_Not(ps_vars[1]);
+	U_temp = (ps_vars[1]);
 	Cudd_Ref(U_temp);
 	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
 	Cudd_Ref(U_temp1);
@@ -713,7 +714,7 @@ void reachable_states_monolithic_tr()
 	Cudd_RecursiveDeref(gbm,U_temp);
 	U = U_temp1;
 	
-	U_temp = Cudd_Not(ps_vars[2]); //CURRENT STATE VALUE IS 4
+	U_temp = Cudd_Not(ps_vars[2]); 
 	Cudd_Ref(U_temp);
 	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
 	Cudd_Ref(U_temp1);
@@ -768,14 +769,16 @@ void reachable_states_monolithic_tr()
 	*/
 	
 	//int BH_i = compute_i(U); // currently arbitrarily chosen
-	int BH_i = 4; //hardcoded
+	int BH_i = INITIAL_WEIGHT; //hardcoded
 	int BH_n = BH_i;
-	int delta = 2; //hardcoded
+	int delta = DELTA; //hardcoded
 	
 	int flag = 0;
+	DdNode* U_lift;
+	DdNode* U_new = U;
 	while(BH_n >= BH_i - delta) {
-		DdNode* U_lift = lift(U, BH_i, ps_vars, ns_vars, ps_in_cube);
-		DdNode* U_new = backward_reach(U_lift, BH_i, tr, ps_vars, ns_vars, ns_in_cube);
+		U_lift = lift(U_new, BH_i, ps_vars, ns_vars, ps_in_cube);
+		U_new = backward_reach(U_lift, BH_i, tr, ps_vars, ns_vars, ns_in_cube);
 		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R);
 		Cudd_Ref(intersection);
 		if(intersection != temp_zero) {
@@ -787,6 +790,7 @@ void reachable_states_monolithic_tr()
 			BH_n = BH_i;
 		}
 		BH_i++;
+		
 	}
 	
 	if(flag == 0)
