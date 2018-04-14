@@ -24,9 +24,11 @@ wire next_array[MAXFF];
 DdManager *gbm;	/* Global BDD manager. */
 
 /* Richard's constants */
+/* Remember to change/check these!! */
 int var_size_k = 4;
-int INITIAL_WEIGHT = 4;
+int INITIAL_WEIGHT = 3;
 int DELTA = 2;
+int badStates[2] = {2, 2};
 
 /*  fanout arrays are computed in two passes.
 /*  Pass 1 discovers the sizes of the fanout sets
@@ -541,6 +543,74 @@ DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, 
 	return R;
 }
 
+DdNode *buildBadStates(int *badStates, DdNode **ps_vars) {
+	int numStates = state_var_count / var_size_k;
+	DdNode* U = Cudd_ReadOne(gbm);
+	Cudd_Ref(U);
+	int i;
+	for(i = 0; i < numStates; i++) {
+		int index = i * var_size_k;
+		int num = badStates[i];
+		int counter = 0;
+		while(num > 0) {
+			if(num % 2 == 0){
+				DdNode* U_temp = Cudd_Not(ps_vars[index++]);
+				Cudd_Ref(U_temp);
+				DdNode* U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+				Cudd_Ref(U_temp1);
+				Cudd_RecursiveDeref(gbm,U);
+				Cudd_RecursiveDeref(gbm,U_temp);
+				U = U_temp1;
+			} else {
+				DdNode* U_temp = ps_vars[index++];
+				Cudd_Ref(U_temp);
+				DdNode* U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+				Cudd_Ref(U_temp1);
+				Cudd_RecursiveDeref(gbm,U);
+				Cudd_RecursiveDeref(gbm,U_temp);
+				U = U_temp1;
+			}
+			num /= 2;
+			counter++;
+		}
+		
+		while(counter++ < var_size_k) {
+				DdNode* U_temp = Cudd_Not(ps_vars[index++]);
+				Cudd_Ref(U_temp);
+				DdNode* U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
+				Cudd_Ref(U_temp1);
+				Cudd_RecursiveDeref(gbm,U);
+				Cudd_RecursiveDeref(gbm,U_temp);
+				U = U_temp1;
+		}
+	}
+	return U;
+}
+
+void buildSelector() {
+
+/*
+	DdNode *t = input_array[1]->bdd_var;
+	DdNode *one = Cudd_ReadOne(gbm);
+	Cudd_Ref(one);
+	DdNode *temp = Cudd_bddOr(gbm, t, one);
+	Cudd_Ref(temp);
+	
+	Cudd_RecursiveDeref(gbm, t);
+	Cudd_RecursiveDeref(gbm, one);
+	
+	DdNode *new = Cudd_Not(temp);
+	Cudd_Ref(new);
+	Cudd_RecursiveDeref(gbm, temp);
+	input_array[1]->bdd_var = new;
+	//TODO
+	*/
+	DdNode *zero = Cudd_ReadOne(gbm);
+	Cudd_Ref(zero);
+	Cudd_RecursiveDeref(gbm,input_array[1]->bdd_var);
+	input_array[1]->bdd_var = zero;
+}
+
 void reachable_states_monolithic_tr()
 	/* Computes the set of reachable states by building the
 	   single monolithic transition relation. */
@@ -692,45 +762,15 @@ void reachable_states_monolithic_tr()
         Cudd_RecursiveDeref(gbm, temp_present_new_R); 
     } while (temp_comp == temp_zero);
     printf("Done\n\n");
-    
 	/*BH Checking Algorithm*/
 	
 	// Building the bad state
-	DdNode* U = Cudd_ReadOne(gbm);
-	Cudd_Ref(U);
-	DdNode* U_temp = Cudd_Not(ps_vars[0]);
-	Cudd_Ref(U_temp);
-	DdNode* U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
-	Cudd_Ref(U_temp1);
-	Cudd_RecursiveDeref(gbm,U);
-	Cudd_RecursiveDeref(gbm,U_temp);
-	U = U_temp1;
+		
 	
-	U_temp = (ps_vars[1]);
-	Cudd_Ref(U_temp);
-	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
-	Cudd_Ref(U_temp1);
-	Cudd_RecursiveDeref(gbm,U);
-	Cudd_RecursiveDeref(gbm,U_temp);
-	U = U_temp1;
+	DdNode* U = buildBadStates(badStates, ps_vars);
+	// buildSelector();
 	
-	U_temp = Cudd_Not(ps_vars[2]); 
-	Cudd_Ref(U_temp);
-	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
-	Cudd_Ref(U_temp1);
-	Cudd_RecursiveDeref(gbm,U);
-	Cudd_RecursiveDeref(gbm,U_temp);
-	U = U_temp1;
-	
-	U_temp = Cudd_Not(ps_vars[3]);
-	Cudd_Ref(U_temp);
-	U_temp1 = Cudd_bddAnd(gbm, U_temp, U);
-	Cudd_Ref(U_temp1);
-	Cudd_RecursiveDeref(gbm,U);
-	Cudd_RecursiveDeref(gbm,U_temp);
-	U = U_temp1;
-	
-	U_temp = Cudd_bddAnd(gbm, All_possible_states, U);
+	DdNode* U_temp = Cudd_bddAnd(gbm, All_possible_states, U);
 	Cudd_Ref(U_temp);
 	if(U_temp == temp_zero)
 		printf("Bad state doesn't belong to possible states\n");
@@ -840,6 +880,7 @@ main(int argc, char *argv[])
   printf("]\n");
   printf("TESTING=========\n");
   printf("Number of variables： %d\n", state_var_count);
+  printf("Input count: %d\n", input_count);
   printf("TESTING=========\n");
   /* Compute the set of reachable states. */
   /* 	You can also try a different reachability iterations
