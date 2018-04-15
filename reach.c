@@ -26,9 +26,9 @@ DdManager *gbm;	/* Global BDD manager. */
 /* Richard's constants */
 /* Remember to change/check these!! */
 int var_size_k = 4;
-int INITIAL_WEIGHT = 3;
+int INITIAL_WEIGHT = 4;
 int DELTA = 2;
-int badStates[2] = {2, 2};
+int badStates[2] = {4, 4};
 
 /*  fanout arrays are computed in two passes.
 /*  Pass 1 discovers the sizes of the fanout sets
@@ -535,11 +535,12 @@ DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, 
 		Cudd_Ref(temp_R_weight);
 		//Cudd_RecursiveDeref(gbm, temp_R);
 		new_R = temp_R_weight;
-    } while (new_R != R);
+    } while ((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm))); //TODO
 	
-	R = Cudd_bddSwapVariables(gbm,new_R,ps_vars,ns_vars,state_var_count);
-	Cudd_Ref(R);
 	Cudd_RecursiveDeref(gbm, new_R);
+	new_R = Cudd_bddSwapVariables(gbm,R,ps_vars,ns_vars,state_var_count);
+	Cudd_Ref(new_R);
+	Cudd_RecursiveDeref(gbm, R);
 	return R;
 }
 
@@ -768,7 +769,7 @@ void reachable_states_monolithic_tr()
 		
 	
 	DdNode* U = buildBadStates(badStates, ps_vars);
-	// buildSelector();
+	buildSelector();
 	
 	DdNode* U_temp = Cudd_bddAnd(gbm, All_possible_states, U);
 	Cudd_Ref(U_temp);
@@ -816,10 +817,12 @@ void reachable_states_monolithic_tr()
 	int flag = 0;
 	DdNode* U_lift;
 	DdNode* U_new = U;
+	printf("br: %d\n",Cudd_DagSize(U_new));
 	while(BH_n >= BH_i - delta) {
 		U_lift = lift(U_new, BH_i, ps_vars, ns_vars, ps_in_cube);
 		U_new = backward_reach(U_lift, BH_i, tr, ps_vars, ns_vars, ns_in_cube);
-		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R);
+		printf("br: %d\n",Cudd_DagSize(U_new));
+		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R); //TODO: probably shouldn't and with initial_r
 		Cudd_Ref(intersection);
 		if(intersection != temp_zero) {
 			printf("Verification failed\n");
@@ -830,7 +833,6 @@ void reachable_states_monolithic_tr()
 			BH_n = BH_i;
 		}
 		BH_i++;
-		
 	}
 	
 	if(flag == 0)
