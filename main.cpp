@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <ctype.h>
-#define OUTFILENAME "result.bench"
+#define OUTFILENAME "output.bench"
 
 // global counter and constants
 int current_wire_index = 0;
@@ -16,7 +16,7 @@ int num_rules;
 int s_bits;
 int s_start;
 int p_out_result;
-std::ofstream f("output.txt");
+std::ofstream f(OUTFILENAME);
 int mode = 1; // test mode (0) or production mode (1)
 
 std::vector<int> positiveToBinary(int value) {
@@ -437,7 +437,8 @@ int main(int argc, char *argv[]) {
 			if (ps_out.size() != 0)
 				ps_outs.push_back(wire_ps_out_and);
 			else {
-				ps_outs.push_back(wire_one);
+				int in_size = pow(2, s_bits);
+				while (ps_outs.size() < in_size)ps_outs.push_back(wire_one);
 			}
 
 
@@ -489,7 +490,16 @@ int main(int argc, char *argv[]) {
 				
 				int out = countVars*k + i*k + t;
 				f << std::endl << "# mutiplexer for variable " << i << " bit " << t << std::endl;
-				multiplexer(variable_bit, out);
+				//multiplexer(variable_bit, out);
+				
+				int tempOut = current_wire_index++;
+				multiplexer(variable_bit, tempOut);
+				// if P not satisfied, keep original value
+				std::vector<int> tv;
+				tv.push_back(i*k + t);
+				tv.push_back(tempOut);
+				multiplexer21(tv, out, p_out_result);
+				
 			}
 		}
 		

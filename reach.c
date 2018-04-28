@@ -1,4 +1,3 @@
-
 #include <stdlib.h>
 #include "reach.h"
 #include "y.tab.h"
@@ -26,9 +25,9 @@ DdManager *gbm;	/* Global BDD manager. */
 /* Richard's constants */
 /* Remember to change/check these!! */
 int var_size_k = 4;
-int INITIAL_WEIGHT = 4;
+int INITIAL_WEIGHT = 13;
 int DELTA = 2;
-int badStates[2] = {4, 4};
+int badStates[1] = {13};
 
 /*  fanout arrays are computed in two passes.
 /*  Pass 1 discovers the sizes of the fanout sets
@@ -535,8 +534,8 @@ DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, 
 		Cudd_Ref(temp_R_weight);
 		//Cudd_RecursiveDeref(gbm, temp_R);
 		new_R = temp_R_weight;
-    } while ((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm))); //TODO
-	
+    } while ((new_R != R)); //TODO
+	//} while ((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm)));
 	Cudd_RecursiveDeref(gbm, new_R);
 	new_R = Cudd_bddSwapVariables(gbm,R,ps_vars,ns_vars,state_var_count);
 	Cudd_Ref(new_R);
@@ -588,29 +587,6 @@ DdNode *buildBadStates(int *badStates, DdNode **ps_vars) {
 	return U;
 }
 
-void buildSelector() {
-
-/*
-	DdNode *t = input_array[1]->bdd_var;
-	DdNode *one = Cudd_ReadOne(gbm);
-	Cudd_Ref(one);
-	DdNode *temp = Cudd_bddOr(gbm, t, one);
-	Cudd_Ref(temp);
-	
-	Cudd_RecursiveDeref(gbm, t);
-	Cudd_RecursiveDeref(gbm, one);
-	
-	DdNode *new = Cudd_Not(temp);
-	Cudd_Ref(new);
-	Cudd_RecursiveDeref(gbm, temp);
-	input_array[1]->bdd_var = new;
-	//TODO
-	*/
-	DdNode *zero = Cudd_ReadOne(gbm);
-	Cudd_Ref(zero);
-	Cudd_RecursiveDeref(gbm,input_array[1]->bdd_var);
-	input_array[1]->bdd_var = zero;
-}
 
 void reachable_states_monolithic_tr()
 	/* Computes the set of reachable states by building the
@@ -769,7 +745,6 @@ void reachable_states_monolithic_tr()
 		
 	
 	DdNode* U = buildBadStates(badStates, ps_vars);
-	buildSelector();
 	
 	DdNode* U_temp = Cudd_bddAnd(gbm, All_possible_states, U);
 	Cudd_Ref(U_temp);
@@ -889,4 +864,3 @@ main(int argc, char *argv[])
   	and/or a different image computation if you wish. */
   reachable_states_monolithic_tr();
 }
-
