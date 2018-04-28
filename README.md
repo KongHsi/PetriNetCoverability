@@ -8,4 +8,4 @@ TODO:
    
       The second line doesn't really work.
       
-  2. 
+  2. Program crashes if the bad state is reaching the ceil. For example 15, and 15 is already the possible max state.
