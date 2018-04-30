@@ -25,9 +25,9 @@ DdManager *gbm;	/* Global BDD manager. */
 /* Richard's constants */
 /* Remember to change/check these!! */
 int var_size_k = 4;
-int INITIAL_WEIGHT = 1;
-int DELTA = 2;
-int badStates[1] = {1};
+int INITIAL_WEIGHT = 2;
+int DELTA = 4;
+int badStates[3] = {0,2,0};
 
 /*  fanout arrays are computed in two passes.
 /*  Pass 1 discovers the sizes of the fanout sets
@@ -804,12 +804,23 @@ void reachable_states_monolithic_tr()
 		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R); //TODO: probably shouldn't and with initial_r
 		Cudd_Ref(intersection);
 		
-		int asdasd[1] = {1};
-		if(Cudd_bddAnd(gbm, U_new, buildBadStates(asdasd, ps_vars)) != temp_zero)
-			printf("11111111111111111");
-		if(U_new == temp_zero){
-			printf("WOW");
+		/*
+		int a1 = 0, a2=2, a3=0;
+		int asdasd[3];
+		for(; a1 < 4;a1++){
+			for(; a2 < 4;a2++){
+				for(; a3 < 4;a3++){
+					asdasd[0] = a1;
+					asdasd[1] = a2;
+					asdasd[2] = a3;
+					printf("%d", a1);
+					if(Cudd_bddAnd(gbm, All_possible_states, buildBadStates(asdasd, ps_vars)) != temp_zero)
+						printf("11111111111111111");
+				}	
+			}
 		}
+		*/
+		
 		if(intersection != temp_zero) {
 			printf("Verification failed\n");
 			flag = 1;
