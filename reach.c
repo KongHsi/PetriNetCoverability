@@ -25,9 +25,11 @@ DdManager *gbm;	/* Global BDD manager. */
 /* Richard's constants */
 /* Remember to change/check these!! */
 int var_size_k = 4;
-int INITIAL_WEIGHT = 2;
-int DELTA = 4;
-int badStates[3] = {0,2,0};
+int INITIAL_WEIGHT = 1;
+int DELTA = 1;
+int badStates[1] = {1};
+int initialStates[1] = {0};
+
 
 /*  fanout arrays are computed in two passes.
 /*  Pass 1 discovers the sizes of the fanout sets
@@ -534,7 +536,6 @@ DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, 
 		Cudd_RecursiveDeref(gbm,image);
 		Cudd_RecursiveDeref(gbm, temp_R); //and this line
 		new_R = temp_R_weight;
-    //} while ((new_R != R)); //TODO
 	} while ((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm)));
 	Cudd_RecursiveDeref(gbm, new_R);
 	new_R = Cudd_bddSwapVariables(gbm,R,ps_vars,ns_vars,state_var_count);
@@ -659,7 +660,8 @@ void reachable_states_monolithic_tr()
     /* Initialize your iteration with a BDD which says all the latches are 0 */
     /* Take a look at build_reset_bdd(). */
     i = 0;
-    new_R = build_reset_bdd();
+    //new_R = build_reset_bdd();
+	new_R = buildBadStates(initialStates, ps_vars);
     DdNode* initial_R = build_reset_bdd();
     DdNode* outer_Image = Cudd_ReadOne(gbm); // The out most state
     Cudd_Ref(outer_Image);
@@ -688,7 +690,7 @@ void reachable_states_monolithic_tr()
 			Cudd_RecursiveDeref(gbm, temp3);
 		}
 		i++;
-    } while (R != new_R);
+    } while((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm)));
     Cudd_RecursiveDeref(gbm,new_R);
 
 	//temp used to test BH
@@ -737,7 +739,7 @@ void reachable_states_monolithic_tr()
 		Cudd_Ref(temp_comp);
         printf("Iteration %d, comp bdd size is %ld, current bdd size is %ld.\n",i++, Cudd_DagSize(temp_comp), Cudd_DagSize(new_R));
         Cudd_RecursiveDeref(gbm, temp_present_new_R); 
-    } while (temp_comp == temp_zero);
+    } while ((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm)));
     printf("Done\n\n");
 	/*BH Checking Algorithm*/
 	
@@ -796,31 +798,62 @@ void reachable_states_monolithic_tr()
 	int flag = 0;
 	DdNode* U_lift;
 	DdNode* U_new = U;
+	
+	/*
 	printf("br: %d\n",Cudd_DagSize(U_new));
-	while(BH_n >= BH_i - delta) {
-		U_lift = lift(U_new, BH_i, ps_vars, ns_vars, ps_in_cube);
-		U_new = backward_reach(U_lift, BH_i, tr, ps_vars, ns_vars, ns_in_cube);
-		printf("br: %d\n",Cudd_DagSize(U_new));
-		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R); //TODO: probably shouldn't and with initial_r
-		Cudd_Ref(intersection);
+	int a1 = 0, a2=0, a3=0;
+	int asdasd[3];
+	for(a1=0; a1 < 4;a1++){
+		for(a2=0; a2 < 4;a2++){
+			for(a3=0; a3 < 4;a3++){
+				asdasd[0] = a1;
+				asdasd[1] = a2;
+				asdasd[2] = a3;
+				if(Cudd_bddAnd(gbm, U_new, buildBadStates(asdasd, ps_vars)) != temp_zero)
+					printf("%d %d %d\n", a1, a2, a3);
+			}	
+		}
+	}
+	*/
 		
+	while(BH_n >= BH_i - delta) {
+		
+		U_lift = lift(U_new, BH_i, ps_vars, ns_vars, ps_in_cube);
 		/*
-		int a1 = 0, a2=2, a3=0;
-		int asdasd[3];
-		for(; a1 < 4;a1++){
-			for(; a2 < 4;a2++){
-				for(; a3 < 4;a3++){
+		printf("=================================\n");
+		for(a1=0; a1 < 4;a1++){
+			for(a2=0; a2 < 4;a2++){
+				for(a3=0; a3 < 4;a3++){
 					asdasd[0] = a1;
 					asdasd[1] = a2;
 					asdasd[2] = a3;
-					printf("%d", a1);
-					if(Cudd_bddAnd(gbm, All_possible_states, buildBadStates(asdasd, ps_vars)) != temp_zero)
-						printf("11111111111111111");
+					if(Cudd_bddAnd(gbm, U_lift, buildBadStates(asdasd, ps_vars)) != temp_zero)
+						printf("%d %d %d\n", a1, a2, a3);
 				}	
 			}
 		}
 		*/
 		
+		U_new = backward_reach(U_lift, BH_i, tr, ps_vars, ns_vars, ns_in_cube);
+		printf("br: %d\n",Cudd_DagSize(U_new));
+		/*
+		printf("=================================\n");
+		for(a1=0; a1 < 4;a1++){
+			for(a2=0; a2 < 4;a2++){
+				for(a3=0; a3 < 4;a3++){
+					asdasd[0] = a1;
+					asdasd[1] = a2;
+					asdasd[2] = a3;
+					if(Cudd_bddAnd(gbm, U_new, buildBadStates(asdasd, ps_vars)) != temp_zero)
+						printf("%d %d %d\n", a1, a2, a3);
+				}	
+			}
+		}
+		printf("br: %d\n",Cudd_DagSize(U_new));
+		*/
+		
+		DdNode* intersection = Cudd_bddAnd(gbm, U_new, initial_R); //TODO: probably shouldn't and with initial_r
+		Cudd_Ref(intersection);
 		if(intersection != temp_zero) {
 			printf("Verification failed\n");
 			flag = 1;

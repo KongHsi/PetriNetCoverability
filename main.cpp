@@ -120,6 +120,8 @@ std::vector<int> adder_N(int variable, int constant) {
 		carry = temp.at(1);
 		sum.push_back(temp.at(0));
 	}
+
+	sum.push_back(carry);
 	return sum;
 } 
 
@@ -437,12 +439,12 @@ int main(int argc, char *argv[]) {
 			if (ps_out.size() != 0)
 				ps_outs.push_back(wire_ps_out_and);
 			else {
-				int in_size = pow(2, s_bits);
-				while (ps_outs.size() < in_size)ps_outs.push_back(wire_one);
+				ps_outs.push_back(wire_one);
 			}
 
 
 			// now wire_one can be used for multiplexer to determin if Qs will be executed
+			std::vector<int> carries;
 			for (int j = 0; j < Qs.size(); j++) {
 				std::string q = Qs.at(j);
 				int currentVariable = q.at(1) - '0';
@@ -464,15 +466,33 @@ int main(int argc, char *argv[]) {
 					constant = atoi(q.substr(variable_index+1, q.length()).c_str());
 				}
 				
+				//the last element in sum is the carry bit
 				std::vector<int> sum = adder_N(variable, constant);
-				for (int t = 0; t < sum.size(); t++) {
+				for (int t = 0; t < sum.size() - 1; t++) {
 					Qs_out[currentVariable][i][t] = sum.at(t);
 				}
+				carries.push_back(sum.back());
 			}
 
+			f << std::endl << "# anding carries with Ps_out" << std::endl;
+			int p_out = ps_outs.back();
+			ps_outs.pop_back();
+			for (int j = 0; j < carries.size(); j++) {
+				int carry = carries.at(j);
+				int notC = current_wire_index++;
+				int andC = current_wire_index++;
+				f << "G" << notC << " = NOT(G" << carry << ")" << std::endl;
+				f << "G" << andC << " = AND(G" << p_out << ", G" << notC << ")" << std::endl;
+				p_out = andC;
+			}
+			ps_outs.push_back(p_out);
 		} // end of a rule
 		
-		
+
+		int in_size = pow(2, s_bits);
+		while (ps_outs.size() < in_size)ps_outs.push_back(wire_one);
+		std::cout << ps_outs.size();
+
 		//Now select Ps out
 		f << std::endl << "# multiplexer for Ps_out" << std::endl;
 		multiplexer(ps_outs, p_out_result);

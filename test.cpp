@@ -9,12 +9,12 @@
 // modify this part when testing a new file because every file is different
 #define CIRCUIT_FILE "C:\\Users\\Richard\\source\\repos\\petrinet2circuit\\petrinet2circuit\\output.txt"
 #define SPEC_FILE "C:\\Users\\Richard\\source\\repos\\petrinet2circuit\\petrinet2circuit\\test.spec"
-const int max_lines = 1000;
+const int max_lines = 200;
 const int k = 4;
-const int num_inout = 3;
-const int s_start = 28;
-const int num_s = 2;
-const int out_wire = 30;
+const int num_inout = 1;
+const int s_start = 12;
+const int num_s = 1;
+const int out_wire = 13;
 
 void pause() {
 	int a;
@@ -147,7 +147,16 @@ std::vector<int> testCircuit(std::vector<int>& arr_in) {
 			int a = vec.at(0);
 			int b = vec.at(1);
 			int c = vec.at(2);
-			arr[a] = ~(arr[b] | arr[c]);
+		
+			if (arr[b] | arr[c] == 0) {
+				arr[a] = 1;
+			}
+			else {
+				arr[a] = 0;
+			}
+
+
+
 		}
 		else if (s.find("OR") != -1) {
 			std::vector<int> vec;
@@ -173,6 +182,10 @@ std::vector<int> testCircuit(std::vector<int>& arr_in) {
 		out.push_back(arr[i]);
 	}
 	out.push_back(arr[out_wire]);
+
+	for (int i = 0; i < max_lines; i++) {
+		std::cout << i << ":" << arr[i] << std::endl;
+	}
 	return out;
 }
 
@@ -374,11 +387,12 @@ int main(int argc, char *argv[]) {
 				arr[i * k + j] = t.at(j);
 			}
 		}
-		std::vector<int> t = toBinary(c_array[3]);
+		
+		std::vector<int> t = toBinary(c_array[num_inout]);
 		for (int i = 0; i < num_s; i++) {
 			arr[num_inout * k + i] = t.at(i);
 		}
-
+		
 		std::vector<int> circuitOut = testCircuit(arr);
 		std::vector<int> out = testLogic(c_array);
 
