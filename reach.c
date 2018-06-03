@@ -27,8 +27,9 @@ DdManager *gbm;	/* Global BDD manager. */
 int var_size_k = 4;
 int INITIAL_WEIGHT = 1;
 int DELTA = 1;
-int badStates[1] = {1};
-int initialStates[1] = {0};
+int badStates[1] = {0};
+//int initialStates[28] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+int initialStates[1] = {3};
 
 
 /*  fanout arrays are computed in two passes.
@@ -544,7 +545,7 @@ DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, 
 	return new_R;
 }
 
-DdNode *buildBadStates(int *badStates, DdNode **ps_vars) {
+DdNode *buildBadStates(int* badStates, DdNode **ps_vars) {
 	int numStates = state_var_count / var_size_k;
 	DdNode* U = Cudd_ReadOne(gbm);
 	Cudd_Ref(U);
@@ -616,6 +617,13 @@ void reachable_states_monolithic_tr()
     ns_in_cube = Cudd_ReadOne(gbm);
     Cudd_Ref(ps_in_cube);
     Cudd_Ref(ns_in_cube);
+	
+	// 1 and 0
+	DdNode* temp_one = Cudd_ReadOne(gbm);
+    Cudd_Ref(temp_one);
+    DdNode* temp_zero = Cudd_Not(temp_one);
+    Cudd_Ref(temp_zero);
+	
     for (i=0; i<state_var_count; i++) {
 		temp = Cudd_bddAnd(gbm,ps_in_cube,present_array[i]->bdd_var);
 		Cudd_Ref(temp);
@@ -689,6 +697,25 @@ void reachable_states_monolithic_tr()
 			Cudd_Ref(outer_Image);
 			Cudd_RecursiveDeref(gbm, temp3);
 		}
+		
+		//temp
+		int arrr[1] = {0};
+		int iii;
+		for(iii = 0; iii < 16; iii++) {
+			arrr[0] = iii;
+			DdNode* ppp = buildBadStates(arrr, ps_vars);
+			Cudd_Ref(ppp);
+			DdNode* U_temppp = Cudd_bddAnd(gbm, ppp, R);
+			Cudd_Ref(U_temppp);
+			if(U_temppp != temp_zero) {
+				printf("%d ", iii);
+			}
+			Cudd_RecursiveDeref(gbm,ppp);
+			Cudd_RecursiveDeref(gbm,U_temppp);
+		}
+		printf("\n");
+		
+		
 		i++;
     } while((new_R != R) && (new_R != Cudd_ReadLogicZero(gbm)));
     Cudd_RecursiveDeref(gbm,new_R);
@@ -708,11 +735,6 @@ void reachable_states_monolithic_tr()
 	Cudd_CountMinterm(gbm,R,state_var_count));
     Cudd_RecursiveDeref(gbm, R);
 	
-	/* New Stuff */
-	DdNode* temp_one = Cudd_ReadOne(gbm);
-    Cudd_Ref(temp_one);
-    DdNode* temp_zero = Cudd_Not(temp_one);
-    Cudd_Ref(temp_zero);
     
 		// backward reachability
 	printf("\nNow starting for backward reachability\n");
@@ -744,8 +766,6 @@ void reachable_states_monolithic_tr()
 	/*BH Checking Algorithm*/
 	
 	// Building the bad state
-		
-	
 	DdNode* U = buildBadStates(badStates, ps_vars);
 	/*
 	int asdasd[1] = {0};

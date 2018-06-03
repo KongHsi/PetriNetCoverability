@@ -341,7 +341,7 @@ int main(int argc, char *argv[]) {
 						isP = false;
 						std::string add_str = rule.substr(lastIndex, j - lastIndex - 1);
 						stringRemoveChars(std::ref(add_str));
-						if (add_str.length() != 0) {
+						if (add_str.length() != 0 && j - lastIndex - 1 > 0) {
 							Ps.push_back(add_str);
 						}
 					}
@@ -490,7 +490,7 @@ int main(int argc, char *argv[]) {
 		
 
 		int in_size = pow(2, s_bits);
-		while (ps_outs.size() < in_size)ps_outs.push_back(wire_one);
+		while (ps_outs.size() < in_size)ps_outs.push_back(wire_zero);
 		std::cout << ps_outs.size();
 
 		//Now select Ps out
