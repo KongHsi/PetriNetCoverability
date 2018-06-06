@@ -121,7 +121,14 @@ std::vector<int> adder_N(int variable, int constant) {
 		sum.push_back(temp.at(0));
 	}
 
-	sum.push_back(carry);
+	//double check this on how to determine overflow for pos/neg numbers
+	if(constant > 0)
+		sum.push_back(carry);
+	else {
+		int temp_wire = current_wire_index++;
+		f << "G" << temp_wire << " = NOT(G" << carry << ")" << std::endl;
+		sum.push_back(temp_wire);
+	}
 	return sum;
 } 
 
@@ -487,7 +494,6 @@ int main(int argc, char *argv[]) {
 			}
 			ps_outs.push_back(p_out);
 		} // end of a rule
-		
 
 		int in_size = pow(2, s_bits);
 		while (ps_outs.size() < in_size)ps_outs.push_back(wire_zero);
