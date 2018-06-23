@@ -24,13 +24,11 @@ DdManager *gbm;	/* Global BDD manager. */
 
 /* Richard's constants */
 /* Remember to change/check these!! */
-int var_size_k = 4;
-int INITIAL_WEIGHT = 2;
-int DELTA = 1;
-int badStates[28] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-//int badStates[2] = {2,2};
-int initialStates[28] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-//int initialStates[2] = {15,0};
+int var_size_k = 4; // Number of bits/registers for each variable
+int INITIAL_WEIGHT = 2; // Sum of initial values of all variables
+int DELTA = 1; // Max addition/subtraction
+int badStates[28] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // Values for bad states to check
+int initialStates[28] = {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1}; // Initialize values for all variables
 DdNode* temp_one;
 DdNode* temp_zero;
 
@@ -347,11 +345,10 @@ DdNode *build_monolithic_tr()
 	Cudd_RecursiveDeref(gbm,wire_rel);
 	result = temp;
     }
-
     return result;
 }
 
-
+/* Initialize states to 0s*/
 DdNode *build_reset_bdd()
 	/* Builds BDD that forces all state variables to 0,
 	   presumably a reset state. */
@@ -374,7 +371,8 @@ DdNode *build_reset_bdd()
 	return result;
 }
 
-
+/* Compute image base on transition relation */
+/* Current State ---tr---> Next State ---swap back---> Current State*/
 DdNode *image_monolithic_tr(DdNode *tr, DdNode *x,
 	DdNode *ps_input_cube, DdNode **ps_vars, DdNode **ns_vars)
 	/* Computes image of x under transition relation tr. */
@@ -396,6 +394,7 @@ DdNode *image_monolithic_tr(DdNode *tr, DdNode *x,
 	return result;
 }
 
+/* Check if a set a subset of another set */
 int notSubsetOf(DdNode *U_new, DdNode *U_lift) {
 	DdNode* temp = Cudd_bddAnd(gbm, U_new, U_lift);
 	if(U_new != temp) {
@@ -404,10 +403,14 @@ int notSubsetOf(DdNode *U_new, DdNode *U_lift) {
 	return 0;
 }
 
+/* Build an array of Nodes to represent the given number */
 DdNode **intToDdNode(int num){
+	// Check no negative or overflow number
 	if(num < 0 || num >= (int)pow(2.0, (double)var_size_k)) {
 		printf("ERROR: INVALID LIFTING VALUE. \n");
 	}
+	
+	// optimize this, reuse code
 	DdNode* temp_one = Cudd_ReadOne(gbm);
     Cudd_Ref(temp_one);
     DdNode* temp_zero = Cudd_Not(temp_one);
@@ -426,6 +429,7 @@ DdNode **intToDdNode(int num){
 		}
 	}
 	
+	//fill the rest bits to 0s
 	while(i < var_size_k) {
 		nums[i++] = temp_zero;
 	}
@@ -433,6 +437,7 @@ DdNode **intToDdNode(int num){
 	return nums;
 }
 
+/* Logical comparator compares two variables */ 
 DdNode *comparatorLessEqual(DdNode **statesA, DdNode **statesB, int startIndex, int compareWithNumberOrStates) {
 	DdNode* gtb = Cudd_ReadLogicZero(gbm);
 	Cudd_Ref(gtb);
@@ -487,6 +492,7 @@ DdNode *comparatorNumber(DdNode ** vars, int num) {
 	return result;
 }
 
+/* Build comparators for ensuring upper bound */
 DdNode *comparatorState(DdNode ** ps_vars, DdNode ** ns_vars) {
 	int i = 0;
 	DdNode *result = Cudd_ReadOne(gbm);
@@ -503,6 +509,7 @@ DdNode *comparatorState(DdNode ** ps_vars, DdNode ** ns_vars) {
 	return result;
 }
 
+/* Lifting algorithm */ 
 DdNode *lift(DdNode* x, int bound, DdNode ** ps_vars, DdNode ** ns_vars, DdNode *ps_in_cube){
 	DdNode *weightBound = comparatorNumber(ns_vars, bound);
 	DdNode *order = comparatorState(ps_vars, ns_vars);
@@ -564,10 +571,12 @@ DdNode *buildBadStates(int* badStates, DdNode **ps_vars) {
 	return U;
 }
 
+/* Backward reach algorithm */
 DdNode *backward_reach(DdNode *states, int bound, DdNode *tr, DdNode **ps_vars, DdNode **ns_vars, DdNode *ns_in_cube ) {
 	// make state -> ns_vars
 	DdNode *new_R = Cudd_bddSwapVariables(gbm,states,ns_vars,ps_vars,state_var_count);
 	Cudd_Ref(new_R);
+	// Ensure no state exceeds upper bound
 	DdNode *weightBound = comparatorNumber(ns_vars, bound);
 	Cudd_RecursiveDeref(gbm, weightBound);
 	DdNode *R;
